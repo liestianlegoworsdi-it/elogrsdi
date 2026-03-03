@@ -429,7 +429,7 @@ export default function App() {
     setPendingSync([...pendingSync, newItem]);
   };
 
-  const handleFinalizePO = (items: { iddetil: string; poQty: number }[]) => {
+  const handleFinalizePO = (items: { iddetil: string; poQty: number; jmlTerima: number; noPO: string }[]) => {
     const newItem: PendingSyncItem = {
       id: 'SYNC-' + Date.now(),
       type: 'finalizePO',

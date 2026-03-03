@@ -32,7 +32,9 @@ export interface Transaksi {
   SESUAI?: string;
   TanggalTerima?: string;
   POQty?: number;
+  JmlACC?: number;
   StatusPO?: string;
+  NoPO?: string;
 }
 
 export interface CartItem extends Barang {

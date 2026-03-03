@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Printer } from 'lucide-react';
 import { Transaksi, Barang } from '../types';
 
@@ -11,8 +11,19 @@ export const AdminPOView: React.FC<AdminPOViewProps> = ({ transaksi, barang }) =
   const [vendor, setVendor] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [selectedPONumber, setSelectedPONumber] = useState('');
 
   const vendors = [...new Set(barang.map((b) => b.Vendor).filter((v) => v && v !== '-'))];
+  
+  const allPONumbers = useMemo(() => {
+    return [...new Set(transaksi.map(t => t.NoPO).filter(n => n))];
+  }, [transaksi]);
+
+  // Stabilize PO Number so it doesn't change on every re-render (e.g. during sync)
+  const poNumber = React.useMemo(() => {
+    if (selectedPONumber) return selectedPONumber;
+    return `PO-${Math.floor(Math.random() * 90000000 + 10000000)}`;
+  }, [vendor, startDate, endDate, selectedPONumber]);
 
   const parseDate = (dateStr: string) => {
     if (!dateStr) return null;
@@ -28,6 +39,7 @@ export const AdminPOView: React.FC<AdminPOViewProps> = ({ transaksi, barang }) =
     // Only show items that are APPROVED and FINALIZED for PO
     if (tStatus !== 'APPROVED' || poStatus !== 'FINALIZED') return false;
     
+    if (selectedPONumber && t.NoPO !== selectedPONumber) return false;
     if (vendor && t.Vendor !== vendor) return false;
     const tDate = parseDate(t.Tanggal);
     if (!tDate) return false;
@@ -129,7 +141,22 @@ export const AdminPOView: React.FC<AdminPOViewProps> = ({ transaksi, barang }) =
             CETAK SEKARANG
           </button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4 border-t pt-4 border-slate-100">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-4 border-t pt-4 border-slate-100">
+          <div>
+            <label className="text-[8px] font-black text-slate-400 uppercase mb-1 block">Filter No. PO</label>
+            <select
+              value={selectedPONumber}
+              onChange={(e) => setSelectedPONumber(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-[10px] font-bold outline-none"
+            >
+              <option value="">SEMUA PO</option>
+              {allPONumbers.map((n, idx) => (
+                <option key={`po-no-${n}-${idx}`} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </div>
           <div>
             <label className="text-[8px] font-black text-slate-400 uppercase mb-1 block">Filter Vendor</label>
             <select
@@ -180,7 +207,7 @@ export const AdminPOView: React.FC<AdminPOViewProps> = ({ transaksi, barang }) =
           <div className="text-right">
             <p className="text-[10px] font-black text-slate-400 uppercase mb-1">DOKUMEN NO.</p>
             <p className="text-base font-black text-slate-900 border-2 border-slate-900 px-4 py-1 rounded-md italic">
-              PO-{Date.now().toString().slice(-8)}
+              {poNumber}
             </p>
           </div>
         </div>

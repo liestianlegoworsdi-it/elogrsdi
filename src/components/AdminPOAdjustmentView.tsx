@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 
 interface AdminPOAdjustmentViewProps {
   transaksi: Transaksi[];
-  onFinalizePO: (items: { iddetil: string; poQty: number }[]) => void;
+  onFinalizePO: (items: { iddetil: string; poQty: number; jmlTerima: number; noPO: string }[]) => void;
   loading: boolean;
   pendingSyncCount: number;
   onSync: () => void;
@@ -76,7 +76,7 @@ export const AdminPOAdjustmentView: React.FC<AdminPOAdjustmentViewProps> = ({
 
   const grandTotal = useMemo(() => {
     return filteredItems.reduce((sum, item) => {
-      const qty = localAdjustments[String(item.iddetil)] ?? item.POQty ?? item.Qty;
+      const qty = localAdjustments[String(item.iddetil)] ?? item.POQty ?? item.JmlACC ?? item.Qty;
       return sum + (item.Harga * qty);
     }, 0);
   }, [filteredItems, localAdjustments]);
@@ -124,11 +124,30 @@ export const AdminPOAdjustmentView: React.FC<AdminPOAdjustmentViewProps> = ({
 
   const handleFinalize = () => {
     if (selectedItemIds.size === 0) return;
+    
+    // Generate a single PO number for this finalization batch
+    const batchPONumber = `PO-${Math.floor(Math.random() * 90000000 + 10000000)}`;
+    
     const itemsToFinalize = Array.from(selectedItemIds).map(id => {
       const item = approvedItems.find(i => String(i.iddetil) === String(id));
+      
+      // Logic: local adjustment > existing POQty > JmlACC > Qty
+      let finalQty: number;
+      if (localAdjustments[String(id)] !== undefined) {
+        finalQty = Number(localAdjustments[String(id)]);
+      } else if (item?.POQty !== undefined && item?.POQty !== null && item?.POQty !== "") {
+        finalQty = Number(item.POQty);
+      } else if (item?.JmlACC !== undefined && item?.JmlACC !== null && item?.JmlACC !== "") {
+        finalQty = Number(item.JmlACC);
+      } else {
+        finalQty = Number(item?.Qty || 0);
+      }
+
       return {
         iddetil: String(id),
-        poQty: localAdjustments[String(id)] ?? item?.POQty ?? item?.Qty ?? 0
+        poQty: finalQty,
+        jmlTerima: finalQty, // As requested: Jml Terima = Qty PO
+        noPO: batchPONumber
       };
     });
     onFinalizePO(itemsToFinalize);
@@ -269,7 +288,11 @@ export const AdminPOAdjustmentView: React.FC<AdminPOAdjustmentViewProps> = ({
                       {items.map((item, iIdx) => {
                         const idStr = String(item.iddetil);
                         const hasPOQty = item.POQty !== undefined && item.POQty !== null && item.POQty !== "";
-                        const currentPOQty = localAdjustments[idStr] ?? (hasPOQty ? item.POQty : item.Qty);
+                        const hasJmlACC = item.JmlACC !== undefined && item.JmlACC !== null && item.JmlACC !== "";
+                        
+                        const currentPOQty = localAdjustments[idStr] ?? 
+                                           (hasPOQty ? item.POQty : (hasJmlACC ? item.JmlACC : item.Qty));
+                        
                         const isModified = localAdjustments[idStr] !== undefined;
                         const isSelected = selectedItemIds.has(idStr);
                         
