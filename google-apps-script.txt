@@ -1,0 +1,315 @@
+/**
+ * E-LOG RSDI - Google Apps Script Bridge
+ * Spreadsheet ID: 1bAfKEW1IKGeajKqcfHkprNPP0KpJeFhy6Zn-I1uFPw8
+ * 
+ * PETUNJUK:
+ * 1. Buka Spreadsheet Anda.
+ * 2. Menu Extensions > Apps Script.
+ * 3. Hapus semua kode dan tempel kode ini.
+ * 4. Klik Deploy > New Deployment > Web App.
+ * 5. Who has access: Anyone.
+ * 6. Salin URL /exec dan masukkan ke src/services/api.ts di aplikasi.
+ */
+
+const SPREADSHEET_ID = '1bAfKEW1IKGeajKqcfHkprNPP0KpJeFhy6Zn-I1uFPw8';
+
+function doGet(e) {
+  const action = e.parameter.action;
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    
+    if (action === 'getInitialData') {
+      return responseSuccess({
+        barang: getSheetData(ss, 'Barang'),
+        user: getSheetData(ss, 'User'),
+        transaksi: getSheetData(ss, 'Transaksi'),
+        settings: getSettings(ss)
+      });
+    }
+    
+    return responseError('Action GET tidak dikenal');
+  } catch (error) {
+    return responseError(error.toString());
+  }
+}
+
+function doPost(e) {
+  try {
+    const action = e.parameter.action;
+    const payload = JSON.parse(e.postData.contents);
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    
+    // 1. SUBMIT ORDER
+    if (action === 'submitOrder') {
+      const sheet = ss.getSheetByName('Transaksi');
+      if (!sheet) return responseError("Sheet 'Transaksi' tidak ditemukan.");
+      
+      ensureHeaders(sheet, ['iddetil', 'Status PO', 'PO Qty', 'ACC', 'Jml ACC', 'Total ACC']);
+      const headers = sheet.getDataRange().getValues()[0];
+      const colIdDetil = findColumnIndex(headers, 'iddetil');
+      
+      const items = payload.data;
+      if (!items || !items.length) return responseSuccess('No data');
+
+      items.forEach(function(row) {
+        let foundRowIndex = -1;
+        if (colIdDetil !== -1 && row.iddetil) {
+          const currentData = sheet.getDataRange().getValues();
+          for (let i = 1; i < currentData.length; i++) {
+            if (currentData[i][colIdDetil].toString().trim() === row.iddetil.toString().trim()) {
+              foundRowIndex = i + 1;
+              break;
+            }
+          }
+        }
+
+        if (foundRowIndex !== -1) {
+          headers.forEach(function(header, colIdx) {
+            const key = findKeyByHeader(row, header);
+            if (key !== null) sheet.getRange(foundRowIndex, colIdx + 1).setValue(row[key]);
+          });
+        } else {
+          const newRow = headers.map(function(header) {
+            const key = findKeyByHeader(row, header);
+            if (key !== null) return row[key];
+            if (header.toString().trim() === 'ACC') return 'Pending';
+            return '';
+          });
+          sheet.appendRow(newRow);
+        }
+      });
+      return responseSuccess('Order berhasil diproses');
+    }
+
+    // 2. UPDATE APPROVAL
+    if (action === 'updateApproval') {
+      const sheet = ss.getSheetByName('Transaksi');
+      const data = sheet.getDataRange().getValues();
+      const headers = data[0];
+      const colId = findColumnIndex(headers, 'iddetil');
+      const colAcc = findColumnIndex(headers, 'ACC');
+      
+      if (colId === -1 || colAcc === -1) return responseError("Kolom iddetil atau ACC tidak ditemukan");
+
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][colId].toString().trim() === payload.iddetil.toString().trim()) {
+          sheet.getRange(i + 1, colAcc + 1).setValue(payload.status);
+          const colJmlAcc = findColumnIndex(headers, 'Jml ACC');
+          const colTotalAcc = findColumnIndex(headers, 'Total ACC');
+          if (colJmlAcc !== -1) sheet.getRange(i + 1, colJmlAcc + 1).setValue(payload.jmlAcc || 0);
+          if (colTotalAcc !== -1) sheet.getRange(i + 1, colTotalAcc + 1).setValue(payload.totalAcc || 0);
+          break;
+        }
+      }
+      return responseSuccess('Approval diperbarui');
+    }
+
+    // 3. UPDATE TERIMA BARANG
+    if (action === 'updateTerimaBarang') {
+      const sheet = ss.getSheetByName('Transaksi');
+      const data = sheet.getDataRange().getValues();
+      const headers = data[0];
+      const colId = findColumnIndex(headers, 'iddetil');
+      
+      if (colId === -1) return responseError("Kolom iddetil tidak ditemukan");
+
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][colId].toString().trim() === payload.iddetil.toString().trim()) {
+          const colTerima = findColumnIndex(headers, 'Terima Barang');
+          const colSesuai = findColumnIndex(headers, 'SESUAI');
+          const colJmlTerima = findColumnIndex(headers, 'Jml Terima');
+          const colTglTerima = findColumnIndex(headers, 'Tanggal Terima');
+
+          if (colTerima !== -1) sheet.getRange(i + 1, colTerima + 1).setValue('YA');
+          if (colSesuai !== -1) sheet.getRange(i + 1, colSesuai + 1).setValue(payload.sesuai);
+          if (colJmlTerima !== -1) sheet.getRange(i + 1, colJmlTerima + 1).setValue(payload.jmlTerima);
+          if (colTglTerima !== -1) sheet.getRange(i + 1, colTglTerima + 1).setValue(payload.tanggalTerima);
+          break;
+        }
+      }
+      return responseSuccess('Data penerimaan diperbarui');
+    }
+
+    // 4. UPDATE MASTER BARANG
+    if (action === 'updateMasterBarang' || action === 'manageMasterBarang') {
+      const sheet = ss.getSheetByName('Barang');
+      if (!sheet) return responseError("Sheet 'Barang' tidak ditemukan.");
+      const data = sheet.getDataRange().getValues();
+      const headers = data[0];
+      const colId = findColumnIndex(headers, 'id');
+      
+      if (colId === -1) return responseError("Kolom id pada sheet Barang tidak ditemukan");
+
+      let found = false;
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][colId].toString().trim() === payload.id.toString().trim()) {
+          headers.forEach(function(h, idx) {
+            const key = findKeyByHeader(payload, h);
+            if (key !== null) sheet.getRange(i + 1, idx + 1).setValue(payload[key]);
+          });
+          found = true;
+          break;
+        }
+      }
+      
+      if (!found) {
+        const newRow = headers.map(function(h) {
+          const key = findKeyByHeader(payload, h);
+          return key !== null ? payload[key] : '';
+        });
+        sheet.appendRow(newRow);
+      }
+      return responseSuccess('Master Barang diperbarui');
+    }
+
+    // 5. UPDATE SETTINGS
+    if (action === 'updateSettings') {
+      let sheet = ss.getSheetByName('Settings');
+      if (!sheet) {
+        sheet = ss.insertSheet('Settings');
+        sheet.appendRow(['key', 'value']);
+      }
+      const data = sheet.getDataRange().getValues();
+      const keyToFind = payload.key;
+      const newValue = payload.value;
+      let found = false;
+      
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0] == keyToFind) {
+          sheet.getRange(i + 1, 2).setValue(newValue);
+          found = true;
+          break;
+        }
+      }
+      
+      if (!found) {
+        sheet.appendRow([keyToFind, newValue]);
+      }
+      return responseSuccess('Pengaturan diperbarui');
+    }
+
+    // 6. UPDATE PO QTY
+    if (action === 'updatePOQty') {
+      const sheet = ss.getSheetByName('Transaksi');
+      ensureHeaders(sheet, ['iddetil', 'PO Qty']);
+      const data = sheet.getDataRange().getValues();
+      const headers = data[0];
+      const colId = findColumnIndex(headers, 'iddetil');
+      const colPOQty = findColumnIndex(headers, 'PO Qty');
+      
+      if (colId === -1 || colPOQty === -1) return responseError("Kolom iddetil atau PO Qty tidak ditemukan");
+
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][colId].toString().trim() === payload.iddetil.toString().trim()) {
+          sheet.getRange(i + 1, colPOQty + 1).setValue(payload.poQty);
+          break;
+        }
+      }
+      return responseSuccess('PO Qty diperbarui');
+    }
+
+    // 7. FINALIZE PO
+    if (action === 'finalizePO') {
+      const sheet = ss.getSheetByName('Transaksi');
+      ensureHeaders(sheet, ['iddetil', 'Status PO', 'PO Qty']);
+      const data = sheet.getDataRange().getValues();
+      const headers = data[0];
+      const colId = findColumnIndex(headers, 'iddetil');
+      const colStatusPO = findColumnIndex(headers, 'Status PO');
+      const colPOQty = findColumnIndex(headers, 'PO Qty');
+      
+      if (colId === -1 || colStatusPO === -1) return responseError("Kolom iddetil atau Status PO tidak ditemukan");
+
+      const items = payload.items;
+      const itemMap = {};
+      items.forEach(function(it) { itemMap[it.iddetil.toString().trim()] = it.poQty; });
+
+      for (let i = 1; i < data.length; i++) {
+        const id = data[i][colId].toString().trim();
+        if (itemMap.hasOwnProperty(id)) {
+          sheet.getRange(i + 1, colStatusPO + 1).setValue('FINALIZED');
+          if (colPOQty !== -1) sheet.getRange(i + 1, colPOQty + 1).setValue(itemMap[id]);
+        }
+      }
+      return responseSuccess('PO berhasil difinalisasi');
+    }
+
+    return responseError('Action POST tidak dikenal: ' + action);
+  } catch (error) {
+    return responseError(error.toString());
+  }
+}
+
+function ensureHeaders(sheet, essentialHeaders) {
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0] || [];
+  const normalizedHeaders = headers.map(function(h) { 
+    return h.toString().toLowerCase().replace(/\s+/g, ''); 
+  });
+  
+  let added = false;
+  essentialHeaders.forEach(function(h) {
+    const nh = h.toLowerCase().replace(/\s+/g, '');
+    if (normalizedHeaders.indexOf(nh) === -1) {
+      sheet.getRange(1, headers.length + 1).setValue(h);
+      headers.push(h);
+      normalizedHeaders.push(nh);
+      added = true;
+    }
+  });
+  if (added) SpreadsheetApp.flush();
+}
+
+function findKeyByHeader(item, header) {
+  const nh = header.toString().toLowerCase().replace(/\s+/g, '');
+  for (const key in item) {
+    if (key.toLowerCase().replace(/\s+/g, '') === nh) return key;
+  }
+  return null;
+}
+
+function findColumnIndex(headers, target) {
+  const normalizedTarget = target.toLowerCase().replace(/\s+/g, '');
+  for (let i = 0; i < headers.length; i++) {
+    const normalizedHeader = headers[i].toString().toLowerCase().replace(/\s+/g, '');
+    if (normalizedHeader === normalizedTarget) return i;
+  }
+  return -1;
+}
+
+function getSheetData(ss, sheetName) {
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet) return [];
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const result = [];
+  for (let i = 1; i < data.length; i++) {
+    const obj = {};
+    headers.forEach((header, index) => {
+      obj[header.toString().replace(/\s+/g, '')] = data[i][index];
+    });
+    result.push(obj);
+  }
+  return result;
+}
+
+function getSettings(ss) {
+  const sheet = ss.getSheetByName('Settings');
+  if (!sheet) return [];
+  const data = sheet.getDataRange().getValues();
+  const settings = [];
+  for (let i = 1; i < data.length; i++) {
+    settings.push({ key: data[i][0], value: data[i][1] });
+  }
+  return settings;
+}
+
+function responseSuccess(data) {
+  return ContentService.createTextOutput(JSON.stringify({ success: true, data: data }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function responseError(message) {
+  return ContentService.createTextOutput(JSON.stringify({ success: false, message: message }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
