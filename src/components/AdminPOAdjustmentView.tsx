@@ -74,10 +74,30 @@ export const AdminPOAdjustmentView: React.FC<AdminPOAdjustmentViewProps> = ({
     });
   }, [approvedItems, searchTerm, selectedUnit, selectedVendor, startDate, endDate]);
 
+  const getItemQty = (item: Transaksi) => {
+    const idStr = String(item.iddetil);
+    if (localAdjustments[idStr] !== undefined) return Number(localAdjustments[idStr]);
+    
+    const hasPOQty = item.POQty !== undefined && item.POQty !== null && String(item.POQty) !== "";
+    const hasJmlACC = item.JmlACC !== undefined && item.JmlACC !== null && String(item.JmlACC) !== "";
+    
+    if (hasPOQty) return Number(item.POQty);
+    if (hasJmlACC) return Number(item.JmlACC);
+    return Number(item.Qty || 0);
+  };
+
+  const selectedTotal = useMemo(() => {
+    return filteredItems.reduce((sum, item) => {
+      if (!selectedItemIds.has(String(item.iddetil))) return sum;
+      const qty = getItemQty(item);
+      return sum + (Number(item.Harga || 0) * qty);
+    }, 0);
+  }, [filteredItems, localAdjustments, selectedItemIds]);
+
   const grandTotal = useMemo(() => {
     return filteredItems.reduce((sum, item) => {
-      const qty = localAdjustments[String(item.iddetil)] ?? item.POQty ?? item.JmlACC ?? item.Qty;
-      return sum + (item.Harga * qty);
+      const qty = getItemQty(item);
+      return sum + (Number(item.Harga || 0) * qty);
     }, 0);
   }, [filteredItems, localAdjustments]);
 
@@ -135,9 +155,9 @@ export const AdminPOAdjustmentView: React.FC<AdminPOAdjustmentViewProps> = ({
       let finalQty: number;
       if (localAdjustments[String(id)] !== undefined) {
         finalQty = Number(localAdjustments[String(id)]);
-      } else if (item?.POQty !== undefined && item?.POQty !== null && item?.POQty !== "") {
+      } else if (item?.POQty !== undefined && item?.POQty !== null && String(item.POQty) !== "") {
         finalQty = Number(item.POQty);
-      } else if (item?.JmlACC !== undefined && item?.JmlACC !== null && item?.JmlACC !== "") {
+      } else if (item?.JmlACC !== undefined && item?.JmlACC !== null && String(item.JmlACC) !== "") {
         finalQty = Number(item.JmlACC);
       } else {
         finalQty = Number(item?.Qty || 0);
@@ -223,7 +243,11 @@ export const AdminPOAdjustmentView: React.FC<AdminPOAdjustmentViewProps> = ({
             </div>
             
             {selectedItemIds.size > 0 && (
-              <div className="flex gap-2">
+              <div className="flex items-center gap-4">
+                <div className="flex flex-col items-end mr-2">
+                  <span className="text-[8px] font-black text-slate-400 uppercase leading-none mb-1">Total Terpilih</span>
+                  <span className="text-sm font-black text-blue-600 italic">Rp {selectedTotal.toLocaleString('id-ID')}</span>
+                </div>
                 <button
                   onClick={handleFinalize}
                   disabled={loading}
@@ -289,12 +313,7 @@ export const AdminPOAdjustmentView: React.FC<AdminPOAdjustmentViewProps> = ({
                       </tr>
                       {items.map((item, iIdx) => {
                         const idStr = String(item.iddetil);
-                        const hasPOQty = item.POQty !== undefined && item.POQty !== null && item.POQty !== "";
-                        const hasJmlACC = item.JmlACC !== undefined && item.JmlACC !== null && item.JmlACC !== "";
-                        
-                        const currentPOQty = localAdjustments[idStr] ?? 
-                                           (hasPOQty ? item.POQty : (hasJmlACC ? item.JmlACC : item.Qty));
-                        
+                        const currentPOQty = getItemQty(item);
                         const isModified = localAdjustments[idStr] !== undefined;
                         const isSelected = selectedItemIds.has(idStr);
                         
@@ -337,7 +356,7 @@ export const AdminPOAdjustmentView: React.FC<AdminPOAdjustmentViewProps> = ({
                             </td>
                             <td className="px-6 py-3 text-right">
                               <p className="text-sm font-black text-blue-600 italic">
-                                Rp {(item.Harga * currentPOQty).toLocaleString('id-ID')}
+                                Rp {(Number(item.Harga || 0) * currentPOQty).toLocaleString('id-ID')}
                               </p>
                               {isModified && (
                                 <p className="text-[8px] font-bold text-amber-500 uppercase tracking-widest mt-0.5 italic">
@@ -355,12 +374,20 @@ export const AdminPOAdjustmentView: React.FC<AdminPOAdjustmentViewProps> = ({
               {filteredItems.length > 0 && (
                 <tr className="bg-slate-50">
                   <td colSpan={4} className="px-6 py-4 text-right">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-4">Grand Total Estimasi</span>
+                    <div className="flex flex-col items-end">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Grand Total Estimasi (Semua)</span>
+                      <span className="text-sm font-bold text-slate-500 italic">
+                        Rp {grandTotal.toLocaleString('id-ID')}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <span className="text-lg font-black text-blue-600 italic">
-                      Rp {grandTotal.toLocaleString('id-ID')}
-                    </span>
+                    <div className="flex flex-col items-end">
+                      <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Total Terpilih</span>
+                      <span className="text-lg font-black text-blue-600 italic">
+                        Rp {selectedTotal.toLocaleString('id-ID')}
+                      </span>
+                    </div>
                   </td>
                 </tr>
               )}

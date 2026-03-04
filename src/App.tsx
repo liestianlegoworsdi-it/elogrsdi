@@ -600,10 +600,14 @@ export default function App() {
           status: t.ACC || 'Pending',
           items: [],
           total: 0,
+          totalApproved: 0,
         };
       }
       groups[t.Idorder].items.push(t);
       groups[t.Idorder].total += parseFloat(t.Subtotal as any) || 0;
+      if ((t.ACC || '').toLowerCase() === 'approved') {
+        groups[t.Idorder].totalApproved += (t.Harga * (t.JmlACC || 0)) || 0;
+      }
     });
     return Object.values(groups).reverse();
   };

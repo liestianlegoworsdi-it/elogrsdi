@@ -22,10 +22,14 @@ export const AdminMonitoringView: React.FC<AdminMonitoringViewProps> = ({ transa
           status: t.ACC || 'Pending',
           items: [],
           total: 0,
+          totalApproved: 0,
         };
       }
       groups[t.Idorder].items.push(t);
       groups[t.Idorder].total += parseFloat(t.Subtotal as any) || 0;
+      if ((t.ACC || '').toLowerCase() === 'approved') {
+        groups[t.Idorder].totalApproved += (t.Harga * (t.JmlACC || 0)) || 0;
+      }
     });
     return Object.values(groups).reverse();
   };
@@ -43,11 +47,18 @@ export const AdminMonitoringView: React.FC<AdminMonitoringViewProps> = ({ transa
   });
 
   const groups = groupTransactions(filteredTransaksi);
+  const grandTotal = groups.reduce((acc, g) => acc + g.totalApproved, 0);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-[12px] font-black uppercase tracking-widest text-slate-800 italic">Monitoring Pengadaan</h2>
+        <div className="flex items-center gap-6">
+          <h2 className="text-[14px] font-black uppercase tracking-widest text-slate-800 italic">Monitoring Pengadaan</h2>
+          <div className="bg-blue-600 px-8 py-2.5 rounded-[1.2rem] shadow-2xl shadow-blue-600/30 flex flex-col items-center border-2 border-blue-400">
+            <span className="text-[9px] font-black text-blue-100 uppercase tracking-[0.2em] mb-0.5">Grand Total Approved</span>
+            <span className="text-[18px] font-black text-white leading-none tracking-tighter">Rp {grandTotal.toLocaleString('id-ID')}</span>
+          </div>
+        </div>
         <div className="flex bg-slate-100 p-1 rounded-xl">
           <button
             onClick={() => setTab('pending')}
@@ -90,7 +101,8 @@ export const AdminMonitoringView: React.FC<AdminMonitoringViewProps> = ({ transa
               <th className="px-6 py-2 text-[10px] font-black text-slate-400 uppercase">Unit</th>
               <th className="px-6 py-2 text-[10px] font-black text-slate-400 uppercase">Tanggal</th>
               <th className="px-6 py-2 text-[10px] font-black text-slate-400 uppercase">ID Order</th>
-              <th className="px-6 py-2 text-[10px] font-black text-slate-400 uppercase text-right">Total</th>
+              <th className="px-6 py-2 text-[10px] font-black text-slate-400 uppercase text-right">Total Pengajuan</th>
+              <th className="px-6 py-2 text-[10px] font-black text-slate-400 uppercase text-right">Total Approved</th>
               <th className="px-6 py-2 text-[10px] font-black text-slate-400 uppercase text-center">Status</th>
               <th className="px-6 py-2 text-[10px] font-black text-slate-400 uppercase text-center">Opsi</th>
             </tr>
@@ -110,6 +122,9 @@ export const AdminMonitoringView: React.FC<AdminMonitoringViewProps> = ({ transa
                   <td className="px-6 py-2 font-black text-slate-800 text-[11px]">{g.id}</td>
                   <td className="px-6 py-2 text-[11px] font-black text-right">
                     Rp {g.total.toLocaleString('id-ID')}
+                  </td>
+                  <td className="px-6 py-2 text-[11px] font-black text-right text-emerald-600">
+                    Rp {g.totalApproved.toLocaleString('id-ID')}
                   </td>
                   <td className="px-6 py-2 text-center">
                     <span

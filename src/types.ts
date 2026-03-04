@@ -48,6 +48,7 @@ export interface OrderGroup {
   status: string;
   items: Transaksi[];
   total: number;
+  totalApproved: number;
 }
 
 export interface PendingSyncItem {

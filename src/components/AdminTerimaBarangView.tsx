@@ -24,10 +24,14 @@ export const AdminTerimaBarangView: React.FC<AdminTerimaBarangViewProps> = ({ tr
           status: t.ACC || 'Pending',
           items: [],
           total: 0,
+          totalApproved: 0,
         };
       }
       groups[t.Idorder].items.push(t);
       groups[t.Idorder].total += parseFloat(t.Subtotal as any) || 0;
+      if ((t.ACC || '').toLowerCase() === 'approved') {
+        groups[t.Idorder].totalApproved += (t.Harga * (t.JmlACC || 0)) || 0;
+      }
     });
     return Object.values(groups).reverse();
   };
@@ -93,15 +97,16 @@ export const AdminTerimaBarangView: React.FC<AdminTerimaBarangViewProps> = ({ tr
     // If not, process all selected items across all orders
     const targetGroups = idOrder ? groups.filter(g => g.id === idOrder) : groups;
     
-    for (const group of targetGroups) {
+        for (const group of targetGroups) {
       const itemsToSubmit = group.items
         .filter(item => selectedItems.has(item.iddetil))
         .map(item => {
-          const data = terimaData[item.iddetil] || { sesuai: 'YA', jmlTerima: item.Qty };
+          const approvedQty = item.JmlACC ?? item.Qty;
+          const data = terimaData[item.iddetil] || { sesuai: 'YA', jmlTerima: approvedQty };
           return {
             iddetil: item.iddetil,
             sesuai: 'YA', // Force YA as per request "ketika diterima value di kolom 'Terima Barang' menjadi 'YA'"
-            jmlTerima: data.sesuai === 'YA' ? item.Qty : data.jmlTerima
+            jmlTerima: data.sesuai === 'YA' ? approvedQty : data.jmlTerima
           };
         });
 
@@ -121,7 +126,8 @@ export const AdminTerimaBarangView: React.FC<AdminTerimaBarangViewProps> = ({ tr
     if (!group) return;
 
     const itemsToSubmit = group.items.map(item => {
-      const data = terimaData[item.iddetil] || { sesuai: 'YA', jmlTerima: item.Qty };
+      const approvedQty = item.JmlACC ?? item.Qty;
+      const data = terimaData[item.iddetil] || { sesuai: 'YA', jmlTerima: approvedQty };
       return {
         iddetil: item.iddetil,
         sesuai: data.sesuai,
@@ -265,7 +271,8 @@ export const AdminTerimaBarangView: React.FC<AdminTerimaBarangViewProps> = ({ tr
                         </thead>
                         <tbody className="divide-y divide-slate-100 italic">
                           {g.items.map((item, iIdx) => {
-                            const input = terimaData[item.iddetil] || { sesuai: 'YA', jmlTerima: item.Qty };
+                            const approvedQty = item.JmlACC ?? item.Qty;
+                            const input = terimaData[item.iddetil] || { sesuai: 'YA', jmlTerima: approvedQty };
                             const isSelected = selectedItems.has(item.iddetil);
                             return (
                               <tr key={`item-${item.iddetil}-${iIdx}`} className={isSelected ? 'bg-blue-50/30' : ''}>
@@ -291,7 +298,7 @@ export const AdminTerimaBarangView: React.FC<AdminTerimaBarangViewProps> = ({ tr
                                 </td>
                                 <td className="px-6 py-2 text-center">
                                   <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg font-black text-[10px]">
-                                    {item.Qty}
+                                    {approvedQty}
                                   </span>
                                 </td>
                                 <td className="px-6 py-2 text-center">
