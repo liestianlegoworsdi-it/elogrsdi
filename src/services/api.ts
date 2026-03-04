@@ -1,12 +1,13 @@
 import { User, Barang, Transaksi } from '../types';
 
 // GANTI URL DI BAWAH INI dengan Web App URL dari Google Apps Script Anda
-const API_URL = 'https://script.google.com/macros/s/AKfycbxknDCObOo6Vj7zpzvruvWVifO1W9n4HibN1e9bsm6fOacKVTWDUBWQ5L9qwOUoP3lR3A/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbxknDCObOo6Vj7zpzvruvWVifO1W9n4HibN1e9bsm6fOacKVTWDUBWQ5L9qwOUoP3lR3A/exec'.trim();
 
 export async function apiRequest(action: string, method: 'GET' | 'POST' = 'GET', body: any = null) {
   const targetUrl = `${API_URL}?action=${action}&_t=${Date.now()}`;
   const proxyUrl = `/api/proxy?url=${encodeURIComponent(targetUrl)}`;
   
+  console.log(`[API] Requesting ${action} via ${proxyUrl}`);
   const options: RequestInit = { 
     method, 
     mode: 'cors',
@@ -25,6 +26,16 @@ export async function apiRequest(action: string, method: 'GET' | 'POST' = 'GET',
     const text = await response.text();
     
     if (!response.ok) {
+      if (response.status === 404) {
+        if (text.includes('<!DOCTYPE html>')) {
+          throw new Error('Proxy API tidak ditemukan. Server mungkin belum siap atau rute salah. Silakan refresh halaman.');
+        }
+        try {
+          const json = JSON.parse(text);
+          if (json.message) throw new Error(`Proxy Error: ${json.message}`);
+        } catch (e) {}
+        throw new Error(`Google Apps Script mengembalikan 404. Pastikan URL Web App benar dan sudah di-deploy.`);
+      }
       throw new Error(`HTTP Error ${response.status}: ${text.slice(0, 100)}`);
     }
 

@@ -14,8 +14,20 @@ async function startServer() {
   app.use(express.json());
   app.use(express.text());
 
+  // Logging middleware
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      console.log(`[API Request] ${req.method} ${req.path}`);
+    }
+    next();
+  });
+
+  // Health check
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", env: process.env.NODE_ENV, time: new Date().toISOString() });
+  });
+
   // Proxy endpoint for Google Apps Script
-  // This avoids CORS issues in the browser
   app.all("/api/proxy", async (req, res) => {
     const targetUrl = req.query.url as string;
     
@@ -26,7 +38,7 @@ async function startServer() {
     try {
       const method = req.method;
       const headers: any = {
-        "Content-Type": "text/plain;charset=utf-8",
+        "Accept": "application/json",
       };
 
       const options: RequestInit = {
@@ -36,19 +48,23 @@ async function startServer() {
       };
 
       if (method === "POST") {
-        // GAS expects the body as a string
+        headers["Content-Type"] = "text/plain;charset=utf-8";
         options.body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
       }
 
       const response = await fetch(targetUrl, options);
       const data = await response.text();
 
-      // Forward the response status and data
       res.status(response.status).send(data);
     } catch (error: any) {
       console.error("Proxy error:", error);
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: `Proxy Error: ${error.message}` });
     }
+  });
+
+  // API 404 handler - prevents falling through to SPA HTML fallback
+  app.all("/api/*", (req, res) => {
+    res.status(404).json({ success: false, message: `API route ${req.path} not found` });
   });
 
   // Vite middleware for development
