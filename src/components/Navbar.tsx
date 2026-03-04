@@ -79,7 +79,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         icon: <BarChart3 size={14} />,
         items: [
           { id: 'admin_report', label: 'Laporan Pengajuan' },
-          { id: 'admin_efficiency', label: 'Rekap Per Unit' }
+          { id: 'admin_efficiency', label: 'Rekap Per Unit' },
+          { id: 'admin_capaian', label: 'Laporan Capaian' }
         ]
       }
     ] : [])

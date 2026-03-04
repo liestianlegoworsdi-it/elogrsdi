@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Loader2, AlertCircle, LogOut } from 'lucide-react';
-import { User, Barang, Transaksi, CartItem, OrderGroup, PendingSyncItem } from './types';
+import { User, Barang, Transaksi, CartItem, OrderGroup, PendingSyncItem, Anggaran } from './types';
 import { getInitialData, submitOrder as submitOrderApi, updateApproval as updateApprovalApi, updateMasterBarang as updateMasterBarangApi, updateTerimaBarang as updateTerimaBarangApi, updateSettings as updateSettingsApi, updatePOQty as updatePOQtyApi, finalizePO as finalizePOApi } from './services/api';
 import { Navbar } from './components/Navbar';
 import { Login } from './components/Login';
@@ -17,6 +17,7 @@ import { AdminMonitoringView } from './components/AdminMonitoringView';
 import { AdminEfficiencyReportView } from './components/AdminEfficiencyReportView';
 import { AdminSettingsView } from './components/AdminSettingsView';
 import { AdminPOAdjustmentView } from './components/AdminPOAdjustmentView';
+import { AdminBudgetAchievementView } from './components/AdminBudgetAchievementView';
 
 export default function App() {
   const [view, setView] = useState('login');
@@ -24,6 +25,7 @@ export default function App() {
   const [barang, setBarang] = useState<Barang[]>([]);
   const [userList, setUserList] = useState<User[]>([]);
   const [transaksi, setTransaksi] = useState<Transaksi[]>([]);
+  const [anggaran, setAnggaran] = useState<Anggaran[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
@@ -172,6 +174,7 @@ export default function App() {
       setBarang(data.barang || []);
       setUserList(data.user || []);
       setTransaksi(data.transaksi || []);
+      setAnggaran(data.anggaran || []);
       setLastSyncTime(new Date());
       
       if (data.settings) {
@@ -224,9 +227,10 @@ export default function App() {
         setBarang(data.barang || []);
         setUserList(data.user || []);
         setTransaksi(data.transaksi || []);
+        setAnggaran(data.anggaran || []);
         setShowGreeting(true);
         const isAdmin = foundUser.Role.toLowerCase() === 'admin';
-        const initialView = isAdmin || isRequestEnabled ? 'pos' : 'history';
+        const initialView = isAdmin ? 'admin_capaian' : (isRequestEnabled ? 'pos' : 'history');
         setView(initialView);
       } else {
         setError('Username atau Password salah');
@@ -860,7 +864,20 @@ export default function App() {
               <AdminMasterBarangView barang={displayBarang} onSave={handleSaveMaster} loading={syncing} />
             )}
             {view === 'admin_po' && <AdminPOView transaksi={displayTransaksi} barang={displayBarang} />}
-            {view === 'admin_report' && <AdminReportView transaksi={displayTransaksi} users={userList} barang={displayBarang} />}
+            {view === 'admin_report' && (
+              <AdminReportView 
+                transaksi={displayTransaksi} 
+                users={userList} 
+                barang={displayBarang} 
+                initialTab="unit"
+              />
+            )}
+            {view === 'admin_capaian' && (
+              <AdminBudgetAchievementView 
+                transaksi={displayTransaksi} 
+                anggaran={anggaran}
+              />
+            )}
             {view === 'admin_efficiency' && <AdminEfficiencyReportView transaksi={displayTransaksi} users={userList} />}
             {view === 'admin_po_adjustment' && (
               <AdminPOAdjustmentView

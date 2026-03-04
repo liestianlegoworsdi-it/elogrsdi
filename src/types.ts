@@ -51,6 +51,22 @@ export interface OrderGroup {
   totalApproved: number;
 }
 
+export interface Anggaran {
+  [key: string]: any;
+  Januari?: number;
+  Februari?: number;
+  Maret?: number;
+  April?: number;
+  Mei?: number;
+  Juni?: number;
+  Juli?: number;
+  Agustus?: number;
+  September?: number;
+  Oktober?: number;
+  Nopember?: number;
+  Desember?: number;
+}
+
 export interface PendingSyncItem {
   id: string;
   type: 'submitOrder' | 'updateApproval' | 'updateTerimaBarang' | 'updateMasterBarang' | 'updateSettings' | 'updatePO' | 'finalizePO';

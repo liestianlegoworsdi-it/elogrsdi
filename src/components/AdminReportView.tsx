@@ -1,15 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Printer, ChevronDown, Check, X } from 'lucide-react';
-import { Transaksi, User, Barang } from '../types';
+import { Transaksi, User, Barang, Anggaran } from '../types';
+import { TrendingUp, PieChart, BarChart3, AlertTriangle } from 'lucide-react';
 
 interface AdminReportViewProps {
   transaksi: Transaksi[];
   users: User[];
   barang: Barang[];
+  initialTab?: 'unit' | 'vendor';
 }
 
-export const AdminReportView: React.FC<AdminReportViewProps> = ({ transaksi, users, barang }) => {
-  const [tab, setTab] = useState<'unit' | 'vendor'>('unit');
+export const AdminReportView: React.FC<AdminReportViewProps> = ({ transaksi, users, barang, initialTab }) => {
+  const [tab, setTab] = useState<'unit' | 'vendor'>(initialTab || 'unit');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedUnit, setSelectedUnit] = useState('');
@@ -27,6 +29,12 @@ export const AdminReportView: React.FC<AdminReportViewProps> = ({ transaksi, use
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (initialTab) {
+      setTab(initialTab);
+    }
+  }, [initialTab]);
 
   const units = [...new Set(users.map((u) => u.Unit).filter((u) => u))];
   const vendors = [...new Set(barang.map((b) => b.Vendor).filter((v) => v && v !== '-'))];
@@ -124,131 +132,131 @@ export const AdminReportView: React.FC<AdminReportViewProps> = ({ transaksi, use
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-          <div>
-            <label className="text-[8px] font-black text-slate-400 uppercase mb-1 block">Dari Tanggal</label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value);
-                setIsDataVisible(false);
-              }}
-              className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-[10px] font-bold outline-none"
-            />
-          </div>
-          <div>
-            <label className="text-[8px] font-black text-slate-400 uppercase mb-1 block">Sampai Tanggal</label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => {
-                setEndDate(e.target.value);
-                setIsDataVisible(false);
-              }}
-              className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-[10px] font-bold outline-none"
-            />
-          </div>
-          <div>
-            <label className="text-[8px] font-black text-slate-400 uppercase mb-1 block">Unit</label>
-            <select
-              value={selectedUnit}
-              onChange={(e) => {
-                setSelectedUnit(e.target.value);
-                setIsDataVisible(false);
-              }}
-              className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-[10px] font-bold outline-none"
-            >
-              <option value="">SEMUA UNIT</option>
-              {units.map((u, idx) => (
-                <option key={`unit-${u}-${idx}`} value={u}>
-                  {u}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="relative" ref={vendorDropdownRef}>
-            <label className="text-[8px] font-black text-slate-400 uppercase mb-1 block">Vendor</label>
-            <button
-              type="button"
-              onClick={() => setIsVendorDropdownOpen(!isVendorDropdownOpen)}
-              className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-[10px] font-bold outline-none flex items-center justify-between min-h-[38px]"
-            >
-              <div className="flex flex-wrap gap-1 items-center overflow-hidden">
-                {selectedVendors.length === 0 ? (
-                  <span className="text-slate-400">SEMUA VENDOR</span>
-                ) : (
-                  selectedVendors.map((v) => (
-                    <span key={v} className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-md flex items-center gap-1 text-[9px]">
-                      {v}
-                      <X
-                        size={10}
-                        className="cursor-pointer hover:text-blue-900"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedVendors(selectedVendors.filter((sv) => sv !== v));
+            <div>
+              <label className="text-[8px] font-black text-slate-400 uppercase mb-1 block">Dari Tanggal</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  setIsDataVisible(false);
+                }}
+                className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-[10px] font-bold outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-[8px] font-black text-slate-400 uppercase mb-1 block">Sampai Tanggal</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  setIsDataVisible(false);
+                }}
+                className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-[10px] font-bold outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-[8px] font-black text-slate-400 uppercase mb-1 block">Unit</label>
+              <select
+                value={selectedUnit}
+                onChange={(e) => {
+                  setSelectedUnit(e.target.value);
+                  setIsDataVisible(false);
+                }}
+                className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-[10px] font-bold outline-none"
+              >
+                <option value="">SEMUA UNIT</option>
+                {units.map((u, idx) => (
+                  <option key={`unit-${u}-${idx}`} value={u}>
+                    {u}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="relative" ref={vendorDropdownRef}>
+              <label className="text-[8px] font-black text-slate-400 uppercase mb-1 block">Vendor</label>
+              <button
+                type="button"
+                onClick={() => setIsVendorDropdownOpen(!isVendorDropdownOpen)}
+                className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-[10px] font-bold outline-none flex items-center justify-between min-h-[38px]"
+              >
+                <div className="flex flex-wrap gap-1 items-center overflow-hidden">
+                  {selectedVendors.length === 0 ? (
+                    <span className="text-slate-400">SEMUA VENDOR</span>
+                  ) : (
+                    selectedVendors.map((v) => (
+                      <span key={v} className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-md flex items-center gap-1 text-[9px]">
+                        {v}
+                        <X
+                          size={10}
+                          className="cursor-pointer hover:text-blue-900"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedVendors(selectedVendors.filter((sv) => sv !== v));
+                            setIsDataVisible(false);
+                          }}
+                        />
+                      </span>
+                    ))
+                  )}
+                </div>
+                <ChevronDown size={14} className={`text-slate-400 transition-transform ${isVendorDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isVendorDropdownOpen && (
+                <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto py-2">
+                  <div
+                    className="px-4 py-2 text-[10px] font-bold text-blue-600 hover:bg-slate-50 cursor-pointer flex items-center justify-between"
+                    onClick={() => {
+                      setSelectedVendors([]);
+                      setIsDataVisible(false);
+                    }}
+                  >
+                    SEMUA VENDOR
+                    {selectedVendors.length === 0 && <Check size={12} />}
+                  </div>
+                  <div className="border-t border-slate-100 my-1"></div>
+                  {vendors.map((v) => {
+                    const isSelected = selectedVendors.includes(v);
+                    return (
+                      <div
+                        key={v}
+                        className={`px-4 py-2 text-[10px] font-bold hover:bg-slate-50 cursor-pointer flex items-center justify-between ${
+                          isSelected ? 'text-blue-600 bg-blue-50/50' : 'text-slate-600'
+                        }`}
+                        onClick={() => {
+                          if (isSelected) {
+                            setSelectedVendors(selectedVendors.filter((sv) => sv !== v));
+                          } else {
+                            setSelectedVendors([...selectedVendors, v]);
+                          }
                           setIsDataVisible(false);
                         }}
-                      />
-                    </span>
-                  ))
-                )}
-              </div>
-              <ChevronDown size={14} className={`text-slate-400 transition-transform ${isVendorDropdownOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            {isVendorDropdownOpen && (
-              <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto py-2">
-                <div
-                  className="px-4 py-2 text-[10px] font-bold text-blue-600 hover:bg-slate-50 cursor-pointer flex items-center justify-between"
-                  onClick={() => {
-                    setSelectedVendors([]);
-                    setIsDataVisible(false);
-                  }}
-                >
-                  SEMUA VENDOR
-                  {selectedVendors.length === 0 && <Check size={12} />}
+                      >
+                        {v}
+                        {isSelected && <Check size={12} />}
+                      </div>
+                    );
+                  })}
                 </div>
-                <div className="border-t border-slate-100 my-1"></div>
-                {vendors.map((v) => {
-                  const isSelected = selectedVendors.includes(v);
-                  return (
-                    <div
-                      key={v}
-                      className={`px-4 py-2 text-[10px] font-bold hover:bg-slate-50 cursor-pointer flex items-center justify-between ${
-                        isSelected ? 'text-blue-600 bg-blue-50/50' : 'text-slate-600'
-                      }`}
-                      onClick={() => {
-                        if (isSelected) {
-                          setSelectedVendors(selectedVendors.filter((sv) => sv !== v));
-                        } else {
-                          setSelectedVendors([...selectedVendors, v]);
-                        }
-                        setIsDataVisible(false);
-                      }}
-                    >
-                      {v}
-                      {isSelected && <Check size={12} />}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+              )}
+            </div>
+            <div>
+              <button
+                onClick={() => {
+                  if (!startDate || !endDate) {
+                    alert('Pilih rentang tanggal terlebih dahulu');
+                    return;
+                  }
+                  setIsDataVisible(true);
+                }}
+                className="w-full bg-blue-600 text-white px-4 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 active:scale-95"
+              >
+                Tampilkan Data
+              </button>
+            </div>
           </div>
-          <div>
-            <button
-              onClick={() => {
-                if (!startDate || !endDate) {
-                  alert('Pilih rentang tanggal terlebih dahulu');
-                  return;
-                }
-                setIsDataVisible(true);
-              }}
-              className="w-full bg-blue-600 text-white px-4 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 active:scale-95"
-            >
-              Tampilkan Data
-            </button>
-          </div>
-        </div>
         <div className="mt-6 flex justify-end">
           <button
             onClick={(e) => {

@@ -23,6 +23,7 @@ function doGet(e) {
         barang: getSheetData(ss, 'Barang'),
         user: getSheetData(ss, 'User'),
         transaksi: getSheetData(ss, 'Transaksi'),
+        anggaran: getSheetData(ss, 'Anggaran'),
         settings: getSettings(ss)
       });
     }

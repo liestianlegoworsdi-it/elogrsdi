@@ -12,18 +12,7 @@ export const AdminPOView: React.FC<AdminPOViewProps> = ({ transaksi, barang }) =
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedPONumber, setSelectedPONumber] = useState('');
-
-  const vendors = [...new Set(barang.map((b) => b.Vendor).filter((v) => v && v !== '-'))];
-  
-  const allPONumbers = useMemo(() => {
-    return [...new Set(transaksi.map(t => t.NoPO).filter(n => n))];
-  }, [transaksi]);
-
-  // Stabilize PO Number so it doesn't change on every re-render (e.g. during sync)
-  const poNumber = React.useMemo(() => {
-    if (selectedPONumber) return selectedPONumber;
-    return `PO-${Math.floor(Math.random() * 90000000 + 10000000)}`;
-  }, [vendor, startDate, endDate, selectedPONumber]);
+  const [isDataVisible, setIsDataVisible] = useState(false);
 
   const parseDate = (dateStr: string) => {
     if (!dateStr) return null;
@@ -32,25 +21,57 @@ export const AdminPOView: React.FC<AdminPOViewProps> = ({ transaksi, barang }) =
     return new Date(dateStr);
   };
 
-  const filteredTrans = transaksi.filter((t) => {
-    const tStatus = (t.ACC || 'Pending').toUpperCase();
-    const poStatus = (t.StatusPO || '').toUpperCase();
-    
-    // Only show items that are APPROVED and FINALIZED for PO
-    if (tStatus !== 'APPROVED' || poStatus !== 'FINALIZED') return false;
-    
-    if (selectedPONumber && t.NoPO !== selectedPONumber) return false;
-    if (vendor && t.Vendor !== vendor) return false;
-    const tDate = parseDate(t.Tanggal);
-    if (!tDate) return false;
-    if (startDate && tDate < new Date(startDate)) return false;
-    if (endDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59);
-      if (tDate > end) return false;
-    }
-    return true;
-  });
+  // Filter approved and finalized transactions by date range first
+  const dateFilteredTrans = useMemo(() => {
+    return transaksi.filter(t => {
+      const tStatus = (t.ACC || 'Pending').toUpperCase();
+      const poStatus = (t.StatusPO || '').toUpperCase();
+      if (tStatus !== 'APPROVED' || poStatus !== 'FINALIZED') return false;
+
+      const tDate = parseDate(t.Tanggal);
+      if (!tDate) return false;
+      if (startDate && tDate < new Date(startDate)) return false;
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59);
+        if (tDate > end) return false;
+      }
+      return true;
+    });
+  }, [transaksi, startDate, endDate]);
+
+  const vendors = useMemo(() => {
+    if (!startDate || !endDate) return [];
+    return [...new Set(dateFilteredTrans.map(t => t.Vendor).filter(v => v && v !== '-'))];
+  }, [dateFilteredTrans, startDate, endDate]);
+  
+  const allPONumbers = useMemo(() => {
+    if (!vendor || !startDate || !endDate) return [];
+    return [...new Set(dateFilteredTrans.filter(t => t.Vendor === vendor).map(t => t.NoPO).filter(n => n))];
+  }, [dateFilteredTrans, vendor, startDate, endDate]);
+
+  // Reset dependent filters and visibility
+  React.useEffect(() => {
+    setVendor('');
+    setSelectedPONumber('');
+    setIsDataVisible(false);
+  }, [startDate, endDate]);
+
+  React.useEffect(() => {
+    setSelectedPONumber('');
+    setIsDataVisible(false);
+  }, [vendor]);
+
+  React.useEffect(() => {
+    setIsDataVisible(false);
+  }, [selectedPONumber]);
+
+  const poNumber = selectedPONumber;
+
+  const filteredTrans = useMemo(() => {
+    if (!isDataVisible || !selectedPONumber) return [];
+    return dateFilteredTrans.filter(t => t.NoPO === selectedPONumber && t.Vendor === vendor);
+  }, [dateFilteredTrans, isDataVisible, selectedPONumber, vendor]);
 
   const grouped: { [key: string]: { NamaBarang: string; Harga: number; Qty: number; Subtotal: number } } = {};
   filteredTrans.forEach((t) => {
@@ -77,6 +98,7 @@ export const AdminPOView: React.FC<AdminPOViewProps> = ({ transaksi, barang }) =
           </div>
           <button
             onClick={(e) => {
+              if (!isDataVisible) return;
               e.preventDefault();
               const printContent = document.getElementById('po-print-area');
               if (!printContent) return;
@@ -135,36 +157,45 @@ export const AdminPOView: React.FC<AdminPOViewProps> = ({ transaksi, barang }) =
               `);
               printWindow.document.close();
             }}
-            className="bg-blue-600 text-white px-6 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest flex items-center gap-2 hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 active:scale-95"
+            className={`px-6 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest flex items-center gap-2 transition-all shadow-lg active:scale-95 ${
+              isDataVisible 
+                ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-600/20' 
+                : 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none'
+            }`}
+            disabled={!isDataVisible}
           >
             <Printer size={14} />
             CETAK SEKARANG
           </button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-4 border-t pt-4 border-slate-100">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mt-4 border-t pt-4 border-slate-100">
           <div>
-            <label className="text-[8px] font-black text-slate-400 uppercase mb-1 block">Filter No. PO</label>
-            <select
-              value={selectedPONumber}
-              onChange={(e) => setSelectedPONumber(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-[10px] font-bold outline-none"
-            >
-              <option value="">SEMUA PO</option>
-              {allPONumbers.map((n, idx) => (
-                <option key={`po-no-${n}-${idx}`} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
+            <label className="text-[8px] font-black text-slate-400 uppercase mb-1 block">1. Dari Tanggal</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-[10px] font-bold outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
           <div>
-            <label className="text-[8px] font-black text-slate-400 uppercase mb-1 block">Filter Vendor</label>
+            <label className="text-[8px] font-black text-slate-400 uppercase mb-1 block">2. Sampai Tanggal</label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-[10px] font-bold outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="text-[8px] font-black text-slate-400 uppercase mb-1 block">3. Pilih Vendor</label>
             <select
               value={vendor}
               onChange={(e) => setVendor(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-[10px] font-bold outline-none"
+              disabled={!startDate || !endDate}
+              className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-[10px] font-bold outline-none disabled:opacity-50 focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">SEMUA VENDOR</option>
+              <option value="">PILIH VENDOR</option>
               {vendors.map((v, idx) => (
                 <option key={`vendor-${v}-${idx}`} value={v}>
                   {v}
@@ -173,27 +204,46 @@ export const AdminPOView: React.FC<AdminPOViewProps> = ({ transaksi, barang }) =
             </select>
           </div>
           <div>
-            <label className="text-[8px] font-black text-slate-400 uppercase mb-1 block">Dari Tanggal</label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-[10px] font-bold outline-none"
-            />
+            <label className="text-[8px] font-black text-slate-400 uppercase mb-1 block">4. Pilih No. PO</label>
+            <select
+              value={selectedPONumber}
+              onChange={(e) => setSelectedPONumber(e.target.value)}
+              disabled={!vendor}
+              className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-[10px] font-bold outline-none disabled:opacity-50 focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">PILIH NO. PO</option>
+              {allPONumbers.map((n, idx) => (
+                <option key={`po-no-${n}-${idx}`} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
           </div>
-          <div>
-            <label className="text-[8px] font-black text-slate-400 uppercase mb-1 block">Sampai Tanggal</label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-[10px] font-bold outline-none"
-            />
+          <div className="flex items-end">
+            <button
+              onClick={() => setIsDataVisible(true)}
+              disabled={!selectedPONumber}
+              className="w-full bg-slate-900 text-white px-4 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-slate-800 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              Tampilkan PO
+            </button>
           </div>
         </div>
       </div>
 
-      <div id="po-print-area" className="bg-white p-10 mx-auto shadow-xl rounded-lg print:shadow-none print:border-none" style={{ width: '210mm', minHeight: '297mm', display: 'flex', flexDirection: 'column' }}>
+      {!isDataVisible ? (
+        <div className="bg-white p-20 rounded-[1.5rem] border border-dashed border-slate-300 flex flex-col items-center justify-center text-center no-print">
+          <div className="bg-slate-50 p-6 rounded-full text-slate-300 mb-4">
+            <Printer size={48} />
+          </div>
+          <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest italic mb-2">Filter Wajib Diisi</h3>
+          <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest max-w-xs leading-relaxed">
+            Silakan pilih Tanggal, Vendor, dan Nomor PO terlebih dahulu, <br/>
+            kemudian klik tombol <span className="text-slate-900">"Tampilkan PO"</span>.
+          </p>
+        </div>
+      ) : (
+        <div id="po-print-area" className="bg-white p-10 mx-auto shadow-xl rounded-lg print:shadow-none print:border-none" style={{ width: '210mm', minHeight: '297mm', display: 'flex', flexDirection: 'column' }}>
         <div className="flex justify-between items-start mb-10 pb-6 border-b-4 border-slate-900">
           <div className="flex items-center gap-4">
             <div className="bg-slate-900 w-4 h-12 rounded-full"></div>
@@ -293,7 +343,8 @@ export const AdminPOView: React.FC<AdminPOViewProps> = ({ transaksi, barang }) =
         <div className="mt-auto pt-4 border-t border-slate-100 text-[8px] font-bold text-slate-300 uppercase tracking-[0.3em] print-footer-timestamp">
           e-Log - Logistics System RSDI Kendal - {new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}
         </div>
-      </div>
+        </div>
+      )}
     </div>
   );
 };

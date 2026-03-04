@@ -1,10 +1,12 @@
 import { User, Barang, Transaksi } from '../types';
 
 // GANTI URL DI BAWAH INI dengan Web App URL dari Google Apps Script Anda
-const API_URL = 'https://script.google.com/macros/s/AKfycbxZ17vtbY42sk3gwqcjNHJteaS8xr8r0sJhQYvDdTTrWmzKw28uOoYQFiRq0k_OWUM/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbxRq34QZfQzI7lJWO2bnvgGyw7DIZNpIxVRSp4fUtcRCuWl2kavOgJeU9UosxtzPZa0/exec';
 
 export async function apiRequest(action: string, method: 'GET' | 'POST' = 'GET', body: any = null) {
-  const url = `${API_URL}?action=${action}&_t=${Date.now()}`;
+  const targetUrl = `${API_URL}?action=${action}&_t=${Date.now()}`;
+  const proxyUrl = `/api/proxy?url=${encodeURIComponent(targetUrl)}`;
+  
   const options: RequestInit = { 
     method, 
     mode: 'cors',
@@ -19,7 +21,7 @@ export async function apiRequest(action: string, method: 'GET' | 'POST' = 'GET',
   }
 
   try {
-    const response = await fetch(url, options);
+    const response = await fetch(proxyUrl, options);
     const text = await response.text();
     
     if (!response.ok) {
