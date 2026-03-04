@@ -1,7 +1,7 @@
 import { User, Barang, Transaksi } from '../types';
 
 // GANTI URL DI BAWAH INI dengan Web App URL dari Google Apps Script Anda
-const API_URL = 'https://script.google.com/macros/s/AKfycbxknDCObOo6Vj7zpzvruvWVifO1W9n4HibN1e9bsm6fOacKVTWDUBWQ5L9qwOUoP3lR3A/exec'.trim();
+const API_URL = 'https://script.google.com/macros/s/AKfycbwJAkB_WIGnvlomBIXVkIcAm71TH54XhHNi15-ag1d7632-hbeoE76YwsVZcbJyyRVCsg/exec'.trim();
 
 export async function apiRequest(action: string, method: 'GET' | 'POST' = 'GET', body: any = null) {
   const targetUrl = `${API_URL}?action=${action}&_t=${Date.now()}`;
