@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Loader2, AlertCircle, LogOut } from 'lucide-react';
+import { Loader2, AlertCircle, LogOut, Activity } from 'lucide-react';
 import { User, Barang, Transaksi, CartItem, OrderGroup, PendingSyncItem, Anggaran } from './types';
 import { getInitialData, submitOrder as submitOrderApi, updateApproval as updateApprovalApi, updateMasterBarang as updateMasterBarangApi, updateTerimaBarang as updateTerimaBarangApi, updateSettings as updateSettingsApi, updatePOQty as updatePOQtyApi, finalizePO as finalizePOApi } from './services/api';
 import { Navbar } from './components/Navbar';
@@ -44,6 +44,25 @@ export default function App() {
     const saved = localStorage.getItem('elog_request_enabled');
     return saved !== null ? JSON.parse(saved) : true;
   });
+  const [serverHealth, setServerHealth] = useState<{ status: string; env: string; googleConnectivity?: string } | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string>('');
+  const [showDebug, setShowDebug] = useState(false);
+
+  const checkHealth = useCallback(async () => {
+    try {
+      const res = await fetch('/api/health');
+      const data = await res.json();
+      setServerHealth(data);
+      setDebugInfo(prev => prev + `\n[${new Date().toLocaleTimeString()}] Health: ${JSON.stringify(data)}`);
+    } catch (err: any) {
+      console.error('Health check failed:', err);
+      setDebugInfo(prev => prev + `\n[${new Date().toLocaleTimeString()}] Health Error: ${err.message}`);
+    }
+  }, []);
+
+  useEffect(() => {
+    checkHealth();
+  }, [checkHealth]);
 
   // Optimistic UI: Merge server data with pending local changes
   const displayTransaksi = React.useMemo(() => {
@@ -671,6 +690,34 @@ export default function App() {
       <>
         {renderLoadingOverlay()}
         <Login onLogin={handleLogin} loading={loading} />
+        
+        {/* Server Health Indicator */}
+        <div className="fixed bottom-4 left-4 z-[100] no-print flex flex-col gap-2">
+          <div 
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-widest shadow-sm cursor-pointer hover:opacity-80 transition-opacity ${serverHealth ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}
+            onClick={() => {
+              checkHealth();
+              setShowDebug(!showDebug);
+            }}
+          >
+            <Activity size={10} className={serverHealth ? 'animate-pulse' : ''} />
+            {serverHealth ? `Server Online (${serverHealth.env})` : 'Server Offline'}
+            {serverHealth?.googleConnectivity && (
+              <span className="ml-2 opacity-50">| Google: {serverHealth.googleConnectivity}</span>
+            )}
+          </div>
+          
+          {showDebug && (
+            <div className="bg-slate-900 text-slate-300 p-3 rounded-lg text-[8px] font-mono max-w-xs max-h-40 overflow-auto shadow-xl border border-slate-800">
+              <div className="flex justify-between items-center mb-2 border-bottom border-slate-800 pb-1">
+                <span className="text-slate-500 uppercase">Debug Console</span>
+                <button onClick={() => setDebugInfo('')} className="hover:text-white">Clear</button>
+              </div>
+              <pre className="whitespace-pre-wrap">{debugInfo || 'No logs yet...'}</pre>
+            </div>
+          )}
+        </div>
+
         <AnimatePresence>
           {error && (
             <motion.div

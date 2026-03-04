@@ -16,15 +16,37 @@ async function startServer() {
 
   // Logging middleware
   app.use((req, res, next) => {
-    if (req.path.startsWith('/api')) {
-      console.log(`[API Request] ${req.method} ${req.path}`);
-    }
+    console.log(`[Server] ${req.method} ${req.url}`);
     next();
   });
 
   // Health check
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", env: process.env.NODE_ENV, time: new Date().toISOString() });
+  app.get("/api/health", async (req, res) => {
+    console.log("[Health] Check received");
+    
+    let googleStatus = "unknown";
+    try {
+      // Use a shorter timeout for the connectivity check
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      const googleRes = await fetch("https://script.google.com", { 
+        method: 'HEAD',
+        signal: controller.signal 
+      });
+      googleStatus = googleRes.ok || googleRes.status === 405 ? "reachable" : `error-${googleRes.status}`;
+      clearTimeout(timeoutId);
+    } catch (e: any) {
+      googleStatus = `unreachable-${e.message}`;
+    }
+
+    res.json({ 
+      status: "ok", 
+      env: process.env.NODE_ENV || "development", 
+      time: new Date().toISOString(),
+      googleConnectivity: googleStatus,
+      nodeVersion: process.version
+    });
   });
 
   // Proxy endpoint for Google Apps Script
@@ -32,8 +54,11 @@ async function startServer() {
     const targetUrl = req.query.url as string;
     
     if (!targetUrl) {
+      console.warn("[Proxy] Missing target URL");
       return res.status(400).json({ success: false, message: "Missing target URL" });
     }
+
+    console.log(`[Proxy] ${req.method} -> ${targetUrl}`);
 
     try {
       const method = req.method;
@@ -41,13 +66,20 @@ async function startServer() {
         "Accept": "application/json",
       };
 
+      // Forward relevant headers if needed, but be careful with host/origin
+      if (req.headers["content-type"]) {
+        headers["Content-Type"] = req.headers["content-type"];
+      }
+
       const options: RequestInit = {
         method,
         headers,
         redirect: "follow",
       };
 
-      if (method === "POST") {
+      if (method !== "GET" && method !== "HEAD") {
+        // For Apps Script, we often need to send as text/plain to avoid CORS issues on their end
+        // even though we are proxying from the server.
         headers["Content-Type"] = "text/plain;charset=utf-8";
         options.body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
       }
@@ -55,16 +87,25 @@ async function startServer() {
       const response = await fetch(targetUrl, options);
       const data = await response.text();
 
+      console.log(`[Proxy] Target responded: ${response.status}`);
+      
+      // Set some headers to avoid caching
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       res.status(response.status).send(data);
     } catch (error: any) {
-      console.error("Proxy error:", error);
-      res.status(500).json({ success: false, message: `Proxy Error: ${error.message}` });
+      console.error("[Proxy] Critical Error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: `Proxy Error: ${error.message}`,
+        stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined
+      });
     }
   });
 
-  // API 404 handler - prevents falling through to SPA HTML fallback
+  // Specific API 404 to prevent falling through to SPA
   app.all("/api/*", (req, res) => {
-    res.status(404).json({ success: false, message: `API route ${req.path} not found` });
+    console.warn(`[API] 404 - Not Found: ${req.url}`);
+    res.status(404).json({ success: false, message: `API route ${req.url} not found` });
   });
 
   // Vite middleware for development
