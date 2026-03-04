@@ -64,7 +64,7 @@ export default function App() {
         result = result.map(t => t.iddetil === iddetil ? { 
           ...t, 
           ACC: status, 
-          Qty: jmlAcc, 
+          JmlACC: jmlAcc,
           Subtotal: totalAcc 
         } : t);
       } else if (item.type === 'updateTerimaBarang') {
@@ -284,8 +284,8 @@ export default function App() {
   const handleSubmitOrder = async () => {
     if (!user || cart.length === 0) return;
     
-    // Safety check: Block submission if admin has disabled requests
-    if (user.Role.toLowerCase() !== 'admin' && !isRequestEnabled) {
+    // Safety check: Block submission if admin has disabled requests (except for revisions)
+    if (user.Role.toLowerCase() !== 'admin' && !isRequestEnabled && !isEditing) {
       setError('Mohon maaf, admin baru saja menonaktifkan menu permintaan. Data Anda tidak dapat dikirim.');
       setView('history');
       setCart([]);
@@ -795,7 +795,7 @@ export default function App() {
       <main className="flex-grow max-w-7xl mx-auto w-full p-4 md:p-6">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
             {view === 'pos' && (
-              user.Role.toLowerCase() === 'admin' || isRequestEnabled ? (
+              user.Role.toLowerCase() === 'admin' || isRequestEnabled || isEditing ? (
                 <POS
                   barang={displayBarang}
                   cart={cart}

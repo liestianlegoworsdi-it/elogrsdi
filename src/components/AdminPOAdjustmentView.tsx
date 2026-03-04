@@ -143,6 +143,8 @@ export const AdminPOAdjustmentView: React.FC<AdminPOAdjustmentViewProps> = ({
         finalQty = Number(item?.Qty || 0);
       }
 
+      if (isNaN(finalQty)) finalQty = 0;
+
       return {
         iddetil: String(id),
         poQty: finalQty,

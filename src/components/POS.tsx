@@ -170,13 +170,13 @@ export const POS: React.FC<POSProps> = ({
                 )}
                 <button
                   onClick={onSubmitOrder}
-                  disabled={loading || !isRequestEnabled}
+                  disabled={loading || (!isEditing && !isRequestEnabled)}
                   className={`${
                     isEditing ? 'flex-[2]' : 'w-full'
-                  } ${!isRequestEnabled ? 'bg-slate-700 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500'} text-white font-black py-4 rounded-2xl text-[10px] uppercase tracking-[0.2em] transition-all shadow-lg flex items-center justify-center gap-2`}
+                  } ${(!isEditing && !isRequestEnabled) ? 'bg-slate-700 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500'} text-white font-black py-4 rounded-2xl text-[10px] uppercase tracking-[0.2em] transition-all shadow-lg flex items-center justify-center gap-2`}
                 >
                   {loading && <Loader2 className="animate-spin" size={16} />}
-                  {!isRequestEnabled ? 'MENU DITUTUP' : (isEditing ? 'UPDATE PESANAN' : 'KIRIM PESANAN')}
+                  {(!isEditing && !isRequestEnabled) ? 'MENU DITUTUP' : (isEditing ? 'UPDATE / SIMPAN PERUBAHAN' : 'KIRIM PESANAN')}
                 </button>
               </div>
             </div>

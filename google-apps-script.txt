@@ -211,38 +211,47 @@ function doPost(e) {
     // 7. FINALIZE PO
     if (action === 'finalizePO') {
       const sheet = ss.getSheetByName('Transaksi');
+      if (!sheet) return responseError("Sheet 'Transaksi' tidak ditemukan.");
+      
       ensureHeaders(sheet, ['iddetil', 'Status PO', 'PO Qty', 'No PO', 'Jml Terima']);
       const data = sheet.getDataRange().getValues();
       const headers = data[0];
+      
       const colId = findColumnIndex(headers, 'iddetil');
       const colStatusPO = findColumnIndex(headers, 'Status PO');
       const colPOQty = findColumnIndex(headers, 'PO Qty');
       const colNoPO = findColumnIndex(headers, 'No PO');
       const colJmlTerima = findColumnIndex(headers, 'Jml Terima');
       
-      if (colId === -1 || colStatusPO === -1) return responseError("Kolom iddetil atau Status PO tidak ditemukan");
+      if (colId === -1) return responseError("Kolom iddetil tidak ditemukan");
 
       const items = payload.items;
+      if (!items || !Array.isArray(items)) return responseError("Payload items tidak valid");
+
       const itemMap = {};
       items.forEach(function(it) { 
-        itemMap[it.iddetil.toString().trim()] = {
-          poQty: it.poQty,
-          noPO: it.noPO,
-          jmlTerima: it.jmlTerima
-        }; 
+        if (it.iddetil) {
+          itemMap[it.iddetil.toString().trim()] = {
+            poQty: it.poQty,
+            noPO: it.noPO,
+            jmlTerima: it.jmlTerima
+          }; 
+        }
       });
 
+      let updatedCount = 0;
       for (let i = 1; i < data.length; i++) {
         const id = data[i][colId].toString().trim();
-        if (itemMap.hasOwnProperty(id)) {
+        if (id && itemMap.hasOwnProperty(id)) {
           const updateData = itemMap[id];
-          sheet.getRange(i + 1, colStatusPO + 1).setValue('FINALIZED');
+          if (colStatusPO !== -1) sheet.getRange(i + 1, colStatusPO + 1).setValue('FINALIZED');
           if (colPOQty !== -1) sheet.getRange(i + 1, colPOQty + 1).setValue(updateData.poQty);
           if (colNoPO !== -1) sheet.getRange(i + 1, colNoPO + 1).setValue(updateData.noPO);
           if (colJmlTerima !== -1) sheet.getRange(i + 1, colJmlTerima + 1).setValue(updateData.jmlTerima);
+          updatedCount++;
         }
       }
-      return responseSuccess('PO berhasil difinalisasi');
+      return responseSuccess('PO berhasil difinalisasi. Total updated: ' + updatedCount);
     }
 
     return responseError('Action POST tidak dikenal: ' + action);
