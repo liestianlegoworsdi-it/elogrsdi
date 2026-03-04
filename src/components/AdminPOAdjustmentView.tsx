@@ -19,10 +19,10 @@ export const AdminPOAdjustmentView: React.FC<AdminPOAdjustmentViewProps> = ({
   onSync
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedUnit, setSelectedUnit] = useState('ALL');
-  const [selectedVendor, setSelectedVendor] = useState('ALL');
+  const [selectedVendor, setSelectedVendor] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [isDataVisible, setIsDataVisible] = useState(false);
   const [localAdjustments, setLocalAdjustments] = useState<{ [key: string]: number }>({});
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
 
@@ -41,20 +41,32 @@ export const AdminPOAdjustmentView: React.FC<AdminPOAdjustmentViewProps> = ({
     );
   }, [transaksi]);
 
-  const units = useMemo(() => {
-    return ['ALL', ...new Set(approvedItems.map(t => t.Unit))];
+  const vendors = useMemo(() => {
+    return [...new Set(approvedItems.map(t => t.Vendor).filter(v => v && v !== '-'))];
   }, [approvedItems]);
 
-  const vendors = useMemo(() => {
-    return ['ALL', ...new Set(approvedItems.map(t => t.Vendor).filter(v => v && v !== '-'))];
-  }, [approvedItems]);
+  // Auto-select first vendor if none selected or current selection invalid
+  React.useEffect(() => {
+    if (vendors.length > 0) {
+      if (!selectedVendor || !vendors.includes(selectedVendor)) {
+        setSelectedVendor(vendors[0]);
+      }
+    } else if (selectedVendor !== '') {
+      setSelectedVendor('');
+    }
+  }, [vendors, selectedVendor]);
+
+  // Reset visibility when filters change
+  React.useEffect(() => {
+    setIsDataVisible(false);
+  }, [selectedVendor, startDate, endDate]);
 
   const filteredItems = useMemo(() => {
+    if (!isDataVisible) return [];
     return approvedItems.filter(t => {
       const matchesSearch = t.NamaBarang.toLowerCase().includes(searchTerm.toLowerCase()) || 
                            t.Idorder.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesUnit = selectedUnit === 'ALL' || t.Unit === selectedUnit;
-      const matchesVendor = selectedVendor === 'ALL' || t.Vendor === selectedVendor;
+      const matchesVendor = t.Vendor === selectedVendor;
       const notReceived = (t.TerimaBarang || '').toUpperCase() !== 'YA';
       
       const tDate = parseDate(t.Tanggal);
@@ -70,9 +82,9 @@ export const AdminPOAdjustmentView: React.FC<AdminPOAdjustmentViewProps> = ({
         matchesDate = false;
       }
 
-      return matchesSearch && matchesUnit && matchesVendor && matchesDate && notReceived;
+      return matchesSearch && matchesVendor && matchesDate && notReceived;
     });
-  }, [approvedItems, searchTerm, selectedUnit, selectedVendor, startDate, endDate]);
+  }, [approvedItems, searchTerm, selectedVendor, startDate, endDate]);
 
   const getItemQty = (item: Transaksi) => {
     const idStr = String(item.iddetil);
@@ -202,22 +214,13 @@ export const AdminPOAdjustmentView: React.FC<AdminPOAdjustmentViewProps> = ({
                 className="pl-11 pr-6 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none w-full md:w-64 transition-all"
               />
             </div>
-            <select
-              value={selectedUnit}
-              onChange={(e) => setSelectedUnit(e.target.value)}
-              className="px-6 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-            >
-              <option value="ALL">SEMUA UNIT</option>
-              {units.filter(u => u !== 'ALL').map((u, idx) => <option key={`${u}-${idx}`} value={u}>{u}</option>)}
-            </select>
 
             <select
               value={selectedVendor}
               onChange={(e) => setSelectedVendor(e.target.value)}
               className="px-6 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none transition-all"
             >
-              <option value="ALL">SEMUA VENDOR</option>
-              {vendors.filter(v => v !== 'ALL').map((v, idx) => <option key={`${v}-${idx}`} value={v}>{v}</option>)}
+              {vendors.map((v, idx) => <option key={`${v}-${idx}`} value={v}>{v}</option>)}
             </select>
 
             <div className="flex items-center gap-3 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-2">
@@ -241,8 +244,17 @@ export const AdminPOAdjustmentView: React.FC<AdminPOAdjustmentViewProps> = ({
                 />
               </div>
             </div>
+
+            <button
+              onClick={() => setIsDataVisible(true)}
+              disabled={!selectedVendor || !startDate || !endDate || loading}
+              className="px-6 py-3 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-slate-900/20 hover:bg-slate-800 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              <Filter size={14} />
+              Tampilkan Data
+            </button>
             
-            {selectedItemIds.size > 0 && (
+            {isDataVisible && selectedItemIds.size > 0 && (
               <div className="flex items-center gap-4">
                 <div className="flex flex-col items-end mr-2">
                   <span className="text-[8px] font-black text-slate-400 uppercase leading-none mb-1">Total Terpilih</span>
@@ -272,139 +284,153 @@ export const AdminPOAdjustmentView: React.FC<AdminPOAdjustmentViewProps> = ({
         </div>
 
         <div className="overflow-x-auto custom-scrollbar">
-          <table className="w-full text-left border-separate border-spacing-y-0">
-            <thead>
-              <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
-                <th className="px-6 py-4 w-10">
-                  <input 
-                    type="checkbox" 
-                    checked={selectedItemIds.size === filteredItems.length && filteredItems.length > 0}
-                    onChange={toggleSelectAll}
-                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                  />
-                </th>
-                <th className="px-6 py-4">Nama Barang & Vendor</th>
-                <th className="px-6 py-4 text-center">Qty Awal</th>
-                <th className="px-6 py-4 text-center w-32">Qty PO</th>
-                <th className="px-6 py-4 text-right">Subtotal Estimasi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(groupedItems).map(([unit, orders], uIdx) => (
-                <React.Fragment key={`unit-${unit}-${uIdx}`}>
-                  <tr className="bg-slate-900">
-                    <td colSpan={5} className="px-6 py-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400"></div>
-                        <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">UNIT: {unit}</span>
+          {!isDataVisible ? (
+            <div className="py-32 flex flex-col items-center justify-center text-center">
+              <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6">
+                <Filter className="text-slate-300" size={32} />
+              </div>
+              <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest italic mb-2">
+                Filter Wajib Diisi
+              </h3>
+              <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest max-w-xs">
+                Pilih Vendor dan Range Tanggal terlebih dahulu, kemudian klik tombol "Tampilkan Data"
+              </p>
+            </div>
+          ) : (
+            <table className="w-full text-left border-separate border-spacing-y-0">
+              <thead>
+                <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                  <th className="px-6 py-4 w-10">
+                    <input 
+                      type="checkbox" 
+                      checked={selectedItemIds.size === filteredItems.length && filteredItems.length > 0}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    />
+                  </th>
+                  <th className="px-6 py-4">Nama Barang & Vendor</th>
+                  <th className="px-6 py-4 text-center">Qty Awal</th>
+                  <th className="px-6 py-4 text-center w-32">Qty PO</th>
+                  <th className="px-6 py-4 text-right">Subtotal Estimasi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(groupedItems).map(([unit, orders], uIdx) => (
+                  <React.Fragment key={`unit-${unit}-${uIdx}`}>
+                    <tr className="bg-slate-900">
+                      <td colSpan={5} className="px-6 py-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400"></div>
+                          <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">UNIT: {unit}</span>
+                        </div>
+                      </td>
+                    </tr>
+                    {Object.entries(orders).map(([orderId, items], oIdx) => (
+                      <React.Fragment key={`order-${orderId}-${oIdx}`}>
+                        <tr className="bg-slate-100/80">
+                          <td className="px-6 py-1.5"></td>
+                          <td colSpan={4} className="px-6 py-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">ORDER ID: {orderId}</span>
+                              <span className="text-[8px] font-bold text-slate-400 uppercase">{items[0].Tanggal}</span>
+                            </div>
+                          </td>
+                        </tr>
+                        {items.map((item, iIdx) => {
+                          const idStr = String(item.iddetil);
+                          const currentPOQty = getItemQty(item);
+                          const isModified = localAdjustments[idStr] !== undefined;
+                          const isSelected = selectedItemIds.has(idStr);
+                          
+                          return (
+                            <motion.tr 
+                              initial={{ opacity: 0, y: 5 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              key={`item-${idStr}-${iIdx}`} 
+                              className={`border-b border-slate-50 hover:bg-slate-50 transition-colors group ${isSelected ? 'bg-blue-50/30' : ''}`}
+                            >
+                              <td className="px-6 py-3">
+                                <input 
+                                  type="checkbox" 
+                                  checked={isSelected}
+                                  onChange={() => toggleSelect(item.iddetil)}
+                                  className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                />
+                              </td>
+                              <td className="px-6 py-3">
+                                <p className="text-xs font-black text-slate-800 uppercase italic">{item.NamaBarang}</p>
+                                <p className="text-[8px] font-bold text-emerald-600 mt-0.5 uppercase tracking-wider">{item.Vendor}</p>
+                              </td>
+                              <td className="px-6 py-3 text-center font-bold text-slate-500 text-xs">
+                                {item.Qty}
+                              </td>
+                              <td className="px-6 py-3 text-center">
+                                <div className="flex items-center justify-center gap-2">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={currentPOQty}
+                                    onChange={(e) => handleQtyChange(item.iddetil, e.target.value, item.Qty)}
+                                    className={`w-20 px-3 py-1.5 rounded-xl text-center text-xs font-black outline-none border-2 transition-all ${
+                                      isModified 
+                                        ? 'border-blue-500 bg-blue-50 text-blue-700' 
+                                        : 'border-slate-200 bg-white text-slate-700 focus:border-blue-300'
+                                    }`}
+                                  />
+                                </div>
+                              </td>
+                              <td className="px-6 py-3 text-right">
+                                <p className="text-sm font-black text-blue-600 italic">
+                                  Rp {(Number(item.Harga || 0) * currentPOQty).toLocaleString('id-ID')}
+                                </p>
+                                {isModified && (
+                                  <p className="text-[8px] font-bold text-amber-500 uppercase tracking-widest mt-0.5 italic">
+                                    Belum Disimpan
+                                  </p>
+                                )}
+                              </td>
+                            </motion.tr>
+                          );
+                        })}
+                      </React.Fragment>
+                    ))}
+                  </React.Fragment>
+                ))}
+                {filteredItems.length > 0 && (
+                  <tr className="bg-slate-50">
+                    <td colSpan={4} className="px-6 py-4 text-right">
+                      <div className="flex flex-col items-end">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Grand Total Estimasi (Semua)</span>
+                        <span className="text-sm font-bold text-slate-500 italic">
+                          Rp {grandTotal.toLocaleString('id-ID')}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex flex-col items-end">
+                        <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Total Terpilih</span>
+                        <span className="text-lg font-black text-blue-600 italic">
+                          Rp {selectedTotal.toLocaleString('id-ID')}
+                        </span>
                       </div>
                     </td>
                   </tr>
-                  {Object.entries(orders).map(([orderId, items], oIdx) => (
-                    <React.Fragment key={`order-${orderId}-${oIdx}`}>
-                      <tr className="bg-slate-100/80">
-                        <td className="px-6 py-1.5"></td>
-                        <td colSpan={4} className="px-6 py-1.5">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">ORDER ID: {orderId}</span>
-                            <span className="text-[8px] font-bold text-slate-400 uppercase">{items[0].Tanggal}</span>
-                          </div>
-                        </td>
-                      </tr>
-                      {items.map((item, iIdx) => {
-                        const idStr = String(item.iddetil);
-                        const currentPOQty = getItemQty(item);
-                        const isModified = localAdjustments[idStr] !== undefined;
-                        const isSelected = selectedItemIds.has(idStr);
-                        
-                        return (
-                          <motion.tr 
-                            initial={{ opacity: 0, y: 5 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            key={`item-${idStr}-${iIdx}`} 
-                            className={`border-b border-slate-50 hover:bg-slate-50 transition-colors group ${isSelected ? 'bg-blue-50/30' : ''}`}
-                          >
-                            <td className="px-6 py-3">
-                              <input 
-                                type="checkbox" 
-                                checked={isSelected}
-                                onChange={() => toggleSelect(item.iddetil)}
-                                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                              />
-                            </td>
-                            <td className="px-6 py-3">
-                              <p className="text-xs font-black text-slate-800 uppercase italic">{item.NamaBarang}</p>
-                              <p className="text-[8px] font-bold text-emerald-600 mt-0.5 uppercase tracking-wider">{item.Vendor}</p>
-                            </td>
-                            <td className="px-6 py-3 text-center font-bold text-slate-500 text-xs">
-                              {item.Qty}
-                            </td>
-                            <td className="px-6 py-3 text-center">
-                              <div className="flex items-center justify-center gap-2">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  value={currentPOQty}
-                                  onChange={(e) => handleQtyChange(item.iddetil, e.target.value, item.Qty)}
-                                  className={`w-20 px-3 py-1.5 rounded-xl text-center text-xs font-black outline-none border-2 transition-all ${
-                                    isModified 
-                                      ? 'border-blue-500 bg-blue-50 text-blue-700' 
-                                      : 'border-slate-200 bg-white text-slate-700 focus:border-blue-300'
-                                  }`}
-                                />
-                              </div>
-                            </td>
-                            <td className="px-6 py-3 text-right">
-                              <p className="text-sm font-black text-blue-600 italic">
-                                Rp {(Number(item.Harga || 0) * currentPOQty).toLocaleString('id-ID')}
-                              </p>
-                              {isModified && (
-                                <p className="text-[8px] font-bold text-amber-500 uppercase tracking-widest mt-0.5 italic">
-                                  Belum Disimpan
-                                </p>
-                              )}
-                            </td>
-                          </motion.tr>
-                        );
-                      })}
-                    </React.Fragment>
-                  ))}
-                </React.Fragment>
-              ))}
-              {filteredItems.length > 0 && (
-                <tr className="bg-slate-50">
-                  <td colSpan={4} className="px-6 py-4 text-right">
-                    <div className="flex flex-col items-end">
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Grand Total Estimasi (Semua)</span>
-                      <span className="text-sm font-bold text-slate-500 italic">
-                        Rp {grandTotal.toLocaleString('id-ID')}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex flex-col items-end">
-                      <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Total Terpilih</span>
-                      <span className="text-lg font-black text-blue-600 italic">
-                        Rp {selectedTotal.toLocaleString('id-ID')}
-                      </span>
-                    </div>
-                  </td>
-                </tr>
-              )}
-              {filteredItems.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="py-20 text-center">
-                    <div className="flex flex-col items-center gap-4">
-                      <div className="bg-slate-100 p-4 rounded-full text-slate-300">
-                        <AlertCircle size={32} />
+                )}
+                {filteredItems.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-20 text-center">
+                      <div className="flex flex-col items-center gap-4">
+                        <div className="bg-slate-100 p-4 rounded-full text-slate-300">
+                          <AlertCircle size={32} />
+                        </div>
+                        <p className="text-xs font-black text-slate-300 uppercase italic tracking-widest">Tidak ada item yang perlu disesuaikan</p>
                       </div>
-                      <p className="text-xs font-black text-slate-300 uppercase italic tracking-widest">Tidak ada item yang perlu disesuaikan</p>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>
