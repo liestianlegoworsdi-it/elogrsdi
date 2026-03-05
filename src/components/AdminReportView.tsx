@@ -18,6 +18,7 @@ export const AdminReportView: React.FC<AdminReportViewProps> = ({ transaksi, use
   const [selectedVendors, setSelectedVendors] = useState<string[]>([]);
   const [isVendorDropdownOpen, setIsVendorDropdownOpen] = useState(false);
   const [isDataVisible, setIsDataVisible] = useState(false);
+  const [useKop, setUseKop] = useState(true);
   const vendorDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -257,6 +258,37 @@ export const AdminReportView: React.FC<AdminReportViewProps> = ({ transaksi, use
               </button>
             </div>
           </div>
+          
+          <div className="mt-6 flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="bg-blue-100 p-2 rounded-lg text-blue-600">
+                <Printer size={16} />
+              </div>
+              <div>
+                <h4 className="text-[9px] font-black text-slate-800 uppercase tracking-wider">Pengaturan Cetak</h4>
+                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Sesuaikan layout sebelum mencetak</p>
+              </div>
+            </div>
+            <div className="h-8 w-px bg-slate-200 mx-2"></div>
+            <label className="flex items-center gap-3 cursor-pointer group">
+              <div 
+                onClick={() => setUseKop(!useKop)}
+                className={`w-10 h-5 rounded-full transition-all relative ${useKop ? 'bg-blue-600' : 'bg-slate-300'}`}
+              >
+                <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${useKop ? 'left-6' : 'left-1'}`}></div>
+              </div>
+              <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest group-hover:text-blue-600 transition-colors">
+                Gunakan KOP Surat {useKop ? '(Aktif)' : '(Non-Aktif)'}
+              </span>
+            </label>
+            {!useKop && (
+              <div className="flex items-center gap-2 text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-100 animate-pulse">
+                <AlertTriangle size={12} />
+                <span className="text-[8px] font-black uppercase tracking-widest">Margin atas akan ditambahkan untuk kertas KOP</span>
+              </div>
+            )}
+          </div>
+
         <div className="mt-6 flex justify-end">
           <button
             onClick={(e) => {
@@ -305,6 +337,10 @@ export const AdminReportView: React.FC<AdminReportViewProps> = ({ transaksi, use
                           box-shadow: none !important;
                           display: block !important;
                           width: 100% !important;
+                        }
+                        /* Spacing for pre-printed letterhead */
+                        .no-kop-margin {
+                          padding-top: 4.5cm !important;
                         }
                         .group-container {
                           break-inside: auto !important;
@@ -375,24 +411,45 @@ export const AdminReportView: React.FC<AdminReportViewProps> = ({ transaksi, use
             </div>
           </div>
 
-          <div className="text-center mb-10 pb-6 border-b-2 border-slate-900 report-header">
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight">
-              LAPORAN REKAP PENGAJUAN {tab === 'vendor' ? 'PER VENDOR' : 'PER UNIT'}
-            </h1>
-            <p className="text-sm font-black text-slate-800 uppercase tracking-[0.2em] mt-2">
-              RSU Muhammadiyah Darul Istiqomah Kendal
-            </p>
-            <div className="flex flex-col items-center gap-2 mt-4 text-[9px] font-black text-slate-400 uppercase tracking-widest italic">
-              <span>
-                Periode: {startDate || 'Awal'} - {endDate || 'Akhir'}
-              </span>
-              {selectedVendors.length > 0 && (
+          {/* Header Laporan */}
+          {useKop ? (
+            <div className="text-center mb-10 pb-6 border-b-2 border-slate-900 report-header">
+              <h1 className="text-3xl font-black text-slate-900 tracking-tight">
+                LAPORAN REKAP PENGAJUAN {tab === 'vendor' ? 'PER VENDOR' : 'PER UNIT'}
+              </h1>
+              <p className="text-sm font-black text-slate-800 uppercase tracking-[0.2em] mt-2">
+                RSU Muhammadiyah Darul Istiqomah Kendal
+              </p>
+              <div className="flex flex-col items-center gap-2 mt-4 text-[9px] font-black text-slate-400 uppercase tracking-widest italic">
                 <span>
-                  Vendor: {selectedVendors.join(', ')}
+                  Periode: {startDate || 'Awal'} - {endDate || 'Akhir'}
                 </span>
-              )}
+                {selectedVendors.length > 0 && (
+                  <span>
+                    Vendor: {selectedVendors.join(', ')}
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="no-kop-margin mb-10 pb-6 border-b-2 border-slate-900 report-header">
+              <div className="text-center">
+                <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase">
+                  LAPORAN REKAP PENGAJUAN {tab === 'vendor' ? 'PER VENDOR' : 'PER UNIT'}
+                </h1>
+                <div className="flex flex-col items-center gap-2 mt-2 text-[9px] font-black text-slate-400 uppercase tracking-widest italic">
+                  <span>
+                    Periode: {startDate || 'Awal'} - {endDate || 'Akhir'}
+                  </span>
+                  {selectedVendors.length > 0 && (
+                    <span>
+                      Vendor: {selectedVendors.join(', ')}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {Object.keys(groupedData).length === 0 ? (
             <div className="py-20 text-center font-black text-slate-300 uppercase tracking-widest italic">
