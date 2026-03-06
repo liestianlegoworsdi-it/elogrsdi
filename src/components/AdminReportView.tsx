@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Printer, ChevronDown, Check, X } from 'lucide-react';
+import { Printer, ChevronDown, Check, X, FileSpreadsheet } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { Transaksi, User, Barang, Anggaran } from '../types';
 import { TrendingUp, PieChart, BarChart3, AlertTriangle } from 'lucide-react';
 
@@ -96,6 +97,81 @@ export const AdminReportView: React.FC<AdminReportViewProps> = ({ transaksi, use
     }
     groupedData[key].total += approvedSubtotal;
   });
+
+  const exportToExcel = () => {
+    const wb = XLSX.utils.book_new();
+    const allRows: any[][] = [];
+
+    // Metadata / Header
+    allRows.push([`LAPORAN REKAP PENGAJUAN ${tab === 'vendor' ? 'PER VENDOR' : 'PER UNIT'}`]);
+    allRows.push([`RSU Muhammadiyah Darul Istiqomah Kendal`]);
+    allRows.push([`Periode: ${startDate || 'Awal'} - ${endDate || 'Akhir'}`]);
+    allRows.push([]);
+
+    Object.keys(groupedData).forEach((key) => {
+      const data = groupedData[key];
+      const rows = tab === 'vendor' ? Object.values(data.aggregated) : data.items;
+
+      // Group Header
+      allRows.push([`${tab === 'vendor' ? 'VENDOR' : 'UNIT'}: ${key}`]);
+      
+      // Table Header
+      if (tab === 'vendor') {
+        allRows.push(['NO', 'NAMA BARANG', 'HARGA', 'ACC', 'SUBTOTAL']);
+      } else {
+        allRows.push(['NO', 'TANGGAL', 'VENDOR', 'NAMA BARANG', 'HARGA', 'ACC', 'SUBTOTAL']);
+      }
+
+      // Data Rows
+      rows.forEach((t: any, idx: number) => {
+        if (tab === 'vendor') {
+          allRows.push([
+            idx + 1,
+            t.NamaBarang,
+            Number(t.Harga) || 0,
+            Number(t.JmlACC) || 0,
+            (Number(t.Harga) || 0) * (Number(t.JmlACC) || 0)
+          ]);
+        } else {
+          allRows.push([
+            idx + 1,
+            t.Tanggal,
+            t.Vendor || '-',
+            t.NamaBarang,
+            Number(t.Harga) || 0,
+            Number(t.JmlACC) || 0,
+            (Number(t.Harga) || 0) * (Number(t.JmlACC) || 0)
+          ]);
+        }
+      });
+
+      // Subtotal for this group
+      if (tab === 'vendor') {
+        allRows.push(['', 'Sub Total (Approved)', '', '', data.total]);
+      } else {
+        allRows.push(['', '', '', 'Sub Total (Approved)', '', '', data.total]);
+      }
+      allRows.push([]); // Empty row for spacing
+    });
+
+    // Total Keseluruhan
+    if (tab === 'vendor') {
+      allRows.push(['', 'TOTAL KESELURUHAN (APPROVED)', '', '', totalReport]);
+    } else {
+      allRows.push(['', '', '', 'TOTAL KESELURUHAN (APPROVED)', '', '', totalReport]);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(allRows);
+    
+    // Set column widths
+    const wscols = tab === 'vendor' 
+      ? [{wch: 5}, {wch: 40}, {wch: 15}, {wch: 10}, {wch: 20}]
+      : [{wch: 5}, {wch: 15}, {wch: 20}, {wch: 40}, {wch: 15}, {wch: 10}, {wch: 20}];
+    ws['!cols'] = wscols;
+
+    XLSX.utils.book_append_sheet(wb, ws, "Laporan Rekap");
+    XLSX.writeFile(wb, `Laporan_Rekap_${tab}_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
 
   return (
     <div className="space-y-4 max-w-6xl mx-auto">
@@ -289,7 +365,14 @@ export const AdminReportView: React.FC<AdminReportViewProps> = ({ transaksi, use
             )}
           </div>
 
-        <div className="mt-6 flex justify-end">
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            onClick={exportToExcel}
+            className="bg-emerald-600 text-white px-8 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg flex items-center gap-2 hover:bg-emerald-700 transition-all active:scale-95"
+          >
+            <FileSpreadsheet size={14} />
+            EXPORT EXCEL
+          </button>
           <button
             onClick={(e) => {
               e.preventDefault();
